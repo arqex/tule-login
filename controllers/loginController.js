@@ -3,14 +3,22 @@
 var config = require('config'),
 	settings = config.require('settings'),
 	log = require('winston'),
-	passport = require('passport')
+	passport = require('passport'),
+	_ = require( 'underscore' ),
+	fs = require('fs')
 ;
 
 var renderForm = function( error, username, res ) {
 		settings.get('assetsUrl')
 			.then( function( url ){
-				res.render( '../login.html', {message: error, username: username, assetsUrl: url});
-
+				fs.readFile(
+					config.path.plugins + '/tule-login/login.html',
+					'utf8',
+					function( err, contents ){
+						var html = _.template( contents, {message: error, username: username, assetsUrl: url});
+						res.send(html);
+					}
+				);
 			})
 		;
 	}

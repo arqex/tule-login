@@ -24,6 +24,7 @@ module.exports = {
 		};
 
 		hooks.addFilter('settings:get:routes:static', function(routes){
+			console.log( 'inited' );
 			routes.push({url: 'tulelogin', path: 'tulelogin/r'});
 			return routes;
 		});
@@ -33,9 +34,9 @@ module.exports = {
 
 			//The splice is necessary to add the route before the default one.
 			routes.splice(-1, 0,
-				{route: 'get::/' + config.tulelogin.urls.login , controller: '/tulelogin/controllers/loginController::login'},
-				{route: 'get::/' + config.tulelogin.urls.logout , controller: '/tulelogin/controllers/loginController::logout'},
-				{route: 'post::/' + config.tulelogin.urls.login , controller: '/tulelogin/controllers/loginController::authenticate'}
+				{route: 'get::/' + config.tulelogin.urls.login , controller: '/tule-login/controllers/loginController::login'},
+				{route: 'get::/' + config.tulelogin.urls.logout , controller: '/tule-login/controllers/loginController::logout'},
+				{route: 'post::/' + config.tulelogin.urls.login , controller: '/tule-login/controllers/loginController::authenticate'}
 			);
 			return routes;
 		});
@@ -55,10 +56,55 @@ module.exports = {
 			return items;
 		});
 
+		var loginMiddleware = require('./login-middleware'),
+			middlewareManager = require( config.path.modules + '/middleware/middlewareManager')
+		;
+
+		hooks.filter( 'middleware', 10, function( handlers ){
+			console.log( 'Handlers' );
+			console.log( handlers );
+			var index = middlewareManager.getMiddlewareIndex( 'session' );
+
+			handlers.splice( index+1, 0, { name: 'tule-login', handler: loginMiddleware.middleware });
+
+
+
+			return handlers;
+		});
+
 		hooks.on( 'settings:ready', function(){
+
+			var settings = config.require( 'settings' ),
+				collectionName = 'collection_' + config.tulelogin.userCollection
+			;
+
+			loginMiddleware.init();
+
 			settings.get( config.tulelogin.settingsName )
 				.then(function( options ){
 					updateSettings( options );
+				})
+			;
+
+			// Check users collection
+			settings.get( collectionName )
+				.then( function( collectionSetting ){
+					if( collectionSetting )
+						return;
+
+					// Create user definition
+					settings.save( collectionSetting, {
+						propertyDefinitions:[
+							{key: 'username', label: 'Username', datatype: {id: 'string'}},
+							{key: 'password', label: 'Password', datatype: {id: 'string'}},
+							{key: 'email', label: 'Email', datatype: {id: 'string'}},
+							{key: 'active', label: 'Active', datatype: {id: 'boolean'}},
+						],
+						headerFields: [ 'username', 'password', 'email', 'active' ],
+						mandatoryProperties: [],
+						hiddenProperties: [],
+						customProperties: true
+					});
 				})
 			;
 
@@ -72,17 +118,6 @@ module.exports = {
 			return observers;
 		});
 		*/
-		var loginMiddleware = require('./login-middleware'),
-			middlewareManager = require( config.path.modules + '/middleware/middlewareManager')
-		;
-		loginMiddleware.init();
-		hooks.filter( 'middleware', 10, function( handlers ){
-			var index = middlewareManager.getMiddlewareIndex( 'session' );
-
-			handlers.splice( index+1, 0, { name: 'tule-login', handler: loginMiddleware.middleware });
-
-			return handlers;
-		});
 	}
 };
 
@@ -97,10 +132,10 @@ var updateSettings = function( newSettings ) {
 
 	// Delete old properties
 	Object.keys( options ).forEach( function( key ){
-		delete options[ keys ];
+		delete options[ key ];
 	});
 
 	// Set the new ones
 	for( var key in newSettings )
-		options[key] = newSettings[keys];
-}
+		options[key] = newSettings[key];
+};

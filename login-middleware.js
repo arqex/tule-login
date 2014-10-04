@@ -1,17 +1,23 @@
+'use strict';
+
 var config = require('config'),
 	passport = require( 'passport' ),
 	LocalStrategy = require( 'passport-local').Strategy,
-	db = config.require( 'qdb' ),
-	dbsettings = config.require( 'settings' )
+	db, dbsettings
 ;
 
 var settings = config.tulelogin.settings,
-	Users = db( config.tulelogin.userCollection ),
 	activeUsers = false,
-	apiUrl = config.tule.apiUrl
+	apiUrl = config.tule.apiUrl,
+	Users
 ;
 
 function init() {
+	// Initialize variables
+	db = config.require( 'qdb' );
+	dbsettings = config.require( 'settings' );
+	Users = db( config.tulelogin.userCollection );
+
 	checkActiveUsers();
 
 	//Update login url
