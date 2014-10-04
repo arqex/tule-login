@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Log in</title>
+	<link rel="stylesheet" href="<%= assetsUrl %>/tule/css/tule.min.css">
+	<style type="text/css">
+
+	</style>
+</head>
+<body>
+<div class="login-container">
+	<div class="login-box">
+		<form method="post">
+			<div class="login-field">
+				<label for="username">User name:</label>
+				<input type="text" name="username" value="<%= username %>">
+			</div>
+			<div class="login-field">
+				<label for="username">Password:</label>
+				<input type="password" name="password">
+			</div>
+			<div class="login-field login-submit">
+				<submit class="button">Log in</submit>
+			</div>
+		</form>
+		<div class="error <%= message ? 'login-visible' : '' %>"><%= message %></div>
+	</div>
+</div>
+</body>
+</html>
