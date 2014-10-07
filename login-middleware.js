@@ -26,6 +26,8 @@ function init() {
 	//Update login url
 	getLoginUrl();
 
+	console.log('Estrategia!');
+
 	passport.use( new LocalStrategy( checkLogin ) );
 
 	passport.serializeUser( function( user, done ){
