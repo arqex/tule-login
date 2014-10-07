@@ -1,12 +1,11 @@
 'use strict';
 
 var config = require('config'),
-	passport = require('passport')
+	logger = require('winston'),
+	Q = require('q')
 ;
 
-var defaultSettings = {
-
-};
+var settings, db, loginMiddleware;
 
 module.exports = {
 	init: function(hooks){
@@ -20,12 +19,15 @@ module.exports = {
 			urls: {
 				login: 'login',
 				logout: 'logout'
+			},
+			cypher: {
+				rounds: 10
 			}
 		};
 
 		hooks.addFilter('settings:get:routes:static', function(routes){
 			console.log( 'inited' );
-			routes.push({url: 'tulelogin', path: 'tulelogin/r'});
+			routes.push({url: 'tulelogin', path: 'tule-login/r'});
 			return routes;
 		});
 
@@ -56,30 +58,32 @@ module.exports = {
 			return items;
 		});
 
-		var loginMiddleware = require('./login-middleware'),
-			middlewareManager = require( config.path.modules + '/middleware/middlewareManager')
+		loginMiddleware = require('./login-middleware');
+		var middlewareManager = require( config.path.modules + '/middleware/middlewareManager')
 		;
 
-		hooks.filter( 'middleware', 10, function( handlers ){
+		console.log( 'Login middleware ...');
+		hooks.addFilter( 'middleware', -10, function( handlers ){
+			var index = middlewareManager.getMiddlewareIndex( 'session', handlers );
+
+			handlers.splice( index + 1, 0, { name: 'tule-login', handler: loginMiddleware.middleware });
+
 			console.log( 'Handlers' );
 			console.log( handlers );
-			var index = middlewareManager.getMiddlewareIndex( 'session' );
-
-			handlers.splice( index+1, 0, { name: 'tule-login', handler: loginMiddleware.middleware });
-
-
 
 			return handlers;
 		});
 
 		hooks.on( 'settings:ready', function(){
 
-			var settings = config.require( 'settings' ),
-				collectionName = 'collection_' + config.tulelogin.userCollection
-			;
+			// Initialize db variables
+			settings = config.require( 'settings' );
+			db = config.require( 'qdb' );
 
+			// Init login middleware
 			loginMiddleware.init();
 
+			// Cache the settings
 			settings.get( config.tulelogin.settingsName )
 				.then(function( options ){
 					updateSettings( options );
@@ -87,38 +91,100 @@ module.exports = {
 			;
 
 			// Check users collection
-			settings.get( collectionName )
-				.then( function( collectionSetting ){
-					if( collectionSetting )
-						return;
-
-					// Create user definition
-					settings.save( collectionSetting, {
-						propertyDefinitions:[
-							{key: 'username', label: 'Username', datatype: {id: 'string'}},
-							{key: 'password', label: 'Password', datatype: {id: 'string'}},
-							{key: 'email', label: 'Email', datatype: {id: 'string'}},
-							{key: 'active', label: 'Active', datatype: {id: 'boolean'}},
-						],
-						headerFields: [ 'username', 'password', 'email', 'active' ],
-						mandatoryProperties: [],
-						hiddenProperties: [],
-						customProperties: true
-					});
-				})
-			;
+			checkUserCollection();
 
 			// Update settings on save
 			hooks.on( 'settings:save:' + config.tulelogin.settingsName, updateSettings );
 		});
 
-		/*
-		hooks.addFilter('settings:get:tulelogin:observers', function( observers ){
-			observers.push('../tulelogin/frontendObserver');
+		hooks.addFilter('settings:get:frontend:observers', function( observers ){
+			observers.push('../tulelogin/loginObserver');
 			return observers;
 		});
-		*/
+
+		hooks.addFilter( 'document:find:users:results', function( users ){
+			if( users && users.length ) {
+				users.forEach( function(u) {
+					u.newpassword = '';
+					u.confirmpassword = '';
+				});
+			}
+
+			return users;
+		});
+
+		hooks.addFilter( 'document:findOne:users:results', function( user ){
+			if( user ) {
+				user.newpassword = '';
+				user.confirmpassword = '';
+			}
+
+			return user;
+		});
+
+		hooks.addFilter( 'document:save:users:args', function( args ){
+			var doc = args[0];
+
+			return updatePassword( doc )
+				.then( function(){
+					return args;
+				})
+			;
+		});
+
+		hooks.addFilter( 'document:insert:users:args', function( args ){
+			var users = args[0],
+				result = Q(1)
+			;
+
+			if( !Array.isArray(users) )
+				users = [args[0]];
+
+			users.forEach(function( u ){
+				result = result.then( loginMiddleware.hash.bind( null, u.password ) )
+					.then( function( hash ){
+						u.password = hash;
+					})
+				;
+			});
+
+			return result.then(function(){
+				return args;
+			});
+		});
+
+		hooks.addFilter( 'document:update:users:args', function( args ){
+			var doc = args[1];
+
+			if( doc.$set )
+				return args;
+
+			return updatePassword( doc )
+				.then( function(){
+					return args;
+				})
+			;
+		});
 	}
+};
+
+var updatePassword = function( doc ) {
+	if( (doc.newpassword || doc.confirmpassword) && doc.newpassword == doc.confirmpassword ) {
+		return loginMiddleware.hash( doc.newpassword )
+			.then( function( hash ){
+				doc.password = hash;
+
+				delete doc.newpassword;
+				delete doc.confirmpassword;
+
+				return doc;
+			})
+		;
+	}
+
+	delete doc.newpassword;
+	delete doc.confirmpassword;
+	return doc;
 };
 
 /**
@@ -138,4 +204,50 @@ var updateSettings = function( newSettings ) {
 	// Set the new ones
 	for( var key in newSettings )
 		options[key] = newSettings[key];
+};
+
+var checkUserCollection = function() {
+	var collectionName = 'collection_' + config.tulelogin.userCollection;
+
+	settings.get( collectionName )
+		.then( function( collectionSetting ){
+			if( collectionSetting ) {
+				return;
+			}
+
+			// Create user definition
+			var settingsDb = config.require( 'db' ).getInstance('settings');
+			settingsDb.collection( config.tule.settingsCollection ).save(
+				{
+					name: collectionName,
+					collectionName: config.tulelogin.userCollection,
+					propertyDefinitions:[
+						{key: 'username', label: 'Username', datatype: {id: 'string'}},
+						{key: 'password', label: 'Password', datatype: {id: 'string'}},
+						{key: 'email', label: 'Email', datatype: {id: 'string'}},
+						{key: 'active', label: 'Active', datatype: {id: 'bool'}},
+						{key: 'newpassword', label: 'New Password', datatype: {id: 'password'}},
+						{key: 'confirmpassword', label: 'Confirm Password', datatype: {id: 'password'}},
+					],
+					headerFields: [ 'username', 'email' ],
+					mandatoryProperties: [ 'username', 'password', 'email', 'active' ],
+					hiddenProperties: [ 'password' ],
+					customProperties: true
+				},
+				function( err ){
+					if( err )
+						console.error( new Error('Could not create the user collection settings.') );
+					else
+						logger.debug( 'User collection settings created.' );
+				}
+			);
+		})
+	;
+
+	// Creates users collection if it doesn't exist
+	db().createCollection( config.tulelogin.userCollection )
+		.then( function(){
+			logger.debug( 'User collection created' );
+		})
+	;
 };

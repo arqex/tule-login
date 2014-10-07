@@ -3,6 +3,9 @@
 var config = require('config'),
 	passport = require( 'passport' ),
 	LocalStrategy = require( 'passport-local').Strategy,
+	bcrypt = require('bcrypt'),
+	Q = require('q'),
+	logger = require( 'winston' ),
 	db, dbsettings
 ;
 
@@ -48,14 +51,13 @@ function getLoginUrl() {
 		})
 	;
 
-	return apiUrl + config.tulelogin.urls.login;
+	return apiUrl + '/' + config.tulelogin.urls.login;
 }
 
 function checkActiveUsers() {
 	return Users.findOne({active:true})
 		.then( function( user ){
-			if( user )
-				activeUsers = true;
+			activeUsers = !!user;
 			return activeUsers;
 		})
 	;
@@ -67,28 +69,32 @@ function checkLogin( username, pass, done ){
 			if( !user )
 				return done( null, false );
 
-			if ( !validPassword( user, pass ) )
-				return done( null, false );
-
-			return done( null, user );
+			return validPassword( user, pass )
+				.then( function( auth ){
+					return done( null, auth ? user : false );
+				})
+			;
+		})
+		.catch( function( err ){
+			logger.error( err );
 		})
 	;
 }
 
 function validPassword( user, pass ){
-	return user.password == pass;
+	return Q.nfcall( bcrypt.compare.bind(bcrypt), pass, user.password );
 }
 
 function isAuthEnabled() {
 	// Check the active users for the next request
 	checkActiveUsers();
 
-	return activeUsers && settings.enabled;
+	return activeUsers;
 }
 
 function middleware(req, res, next) {
-	if( !isAuthEnabled )
-		next();
+	if( !isAuthEnabled() )
+		return next();
 
 	var initMiddleware = passport.initialize(),
 		sessionMiddleWare = passport.session()
@@ -107,7 +113,12 @@ function middleware(req, res, next) {
 	});
 }
 
+function hash( password ) {
+	return Q.nfcall( bcrypt.hash.bind(bcrypt), password, config.tulelogin.cypher.rounds );
+}
+
 module.exports = {
 	init: init,
-	middleware: middleware
+	middleware: middleware,
+	hash: hash
 };

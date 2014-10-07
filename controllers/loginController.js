@@ -5,7 +5,8 @@ var config = require('config'),
 	log = require('winston'),
 	passport = require('passport'),
 	_ = require( 'underscore' ),
-	fs = require('fs')
+	fs = require('fs'),
+	log = require('winston')
 ;
 
 var renderForm = function( error, username, res ) {
@@ -46,7 +47,8 @@ module.exports = {
 	authenticate: function( req, res ){
 		settings.get( 'baseUrl' )
 			.then( function( url ){
-				passport.authenticate( 'local', function( err, user ){
+
+				var authenticate = passport.authenticate( 'local', function( err, user ){
 					if (err) {
 						return renderForm( 'There was an unexpected error.', req.body.username, res);
 					}
@@ -57,9 +59,12 @@ module.exports = {
 					req.logIn( user, function( err ){
 						if( err )
 							return renderForm( 'There was an unexpected error.', req.body.username, res);
+						log.info( 'User ' + req.body.username + ' authenticated.');
 						res.redirect( url );
 					});
 				});
+
+				authenticate( req, res );
 			})
 			.catch( function( err ){
 				log.error( err );
