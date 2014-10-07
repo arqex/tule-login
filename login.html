@@ -33,6 +33,10 @@
 		.login-submit input{
 			width: 100px;
 		}
+
+		.login-visible {
+			padding: 10px 20px;
+		}
 	</style>
 </head>
 <body>
@@ -52,7 +56,7 @@
 				<input type="submit" value="Log in"></input>
 			</div>
 		</form>
-		<div class="error <%= message ? 'login-visible' : '' %>"><%= message %></div>
+		<div class="tule-alert tule-alert-error <%= message ? 'login-visible' : '' %>"><%= message %></div>
 	</div>
 </div>
 </body>

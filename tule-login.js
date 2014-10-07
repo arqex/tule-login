@@ -36,6 +36,7 @@ module.exports = {
 
 			//The splice is necessary to add the route before the default one.
 			routes.splice(-1, 0,
+				{route: 'get::/tulelogin/checkLogin' , controller: '/tule-login/controllers/loginController::checkLogin'},
 				{route: 'get::/' + config.tulelogin.urls.login , controller: '/tule-login/controllers/loginController::login'},
 				{route: 'get::/' + config.tulelogin.urls.logout , controller: '/tule-login/controllers/loginController::logout'},
 				{route: 'post::/' + config.tulelogin.urls.login , controller: '/tule-login/controllers/loginController::authenticate'}

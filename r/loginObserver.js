@@ -4,6 +4,7 @@ var deps = [
 
 var settings;
 
+
 define( deps, function( _, $, Backbone, Events ){
 	'use strict';
 
@@ -20,6 +21,18 @@ define( deps, function( _, $, Backbone, Events ){
 		});
 
 	});
+
+
+	var checkLogin = function() {
+		$.get( settings.url.api + '/checkLogin' )
+			.fail( function( err ){
+				if( err.status )
+					location.reload();
+			})
+		;
+	};
+
+	Events.on('tule:route', checkLogin );
 
 	return {
 		init: function( settingsObject ){

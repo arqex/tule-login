@@ -110,6 +110,10 @@ function middleware(req, res, next) {
 			if( req.isAuthenticated() || req.url == loginUrl )
 				return next();
 
+			if( req.url != loginUrl )
+				req.session.redirect = req.url;
+
+
 			res.redirect( loginUrl );
 		});
 	});

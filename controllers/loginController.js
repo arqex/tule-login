@@ -16,8 +16,10 @@ var renderForm = function( error, username, res ) {
 					config.path.plugins + '/tule-login/login.html',
 					'utf8',
 					function( err, contents ){
-						var html = _.template( contents, {message: error, username: username, assetsUrl: url});
-						res.send(html);
+						var html = _.template( contents, {message: error, username: username, assetsUrl: url}),
+							code = error ? 403 : 200
+						;
+						res.send(code, html);
 					}
 				);
 			})
@@ -26,8 +28,12 @@ var renderForm = function( error, username, res ) {
 ;
 
 module.exports = {
+	checkLogin: function( req, res ){
+		res.send(1);
+	},
 	login: function( req, res ){
-		renderForm( '', '', res );
+		var error = req.session.redirect ? 'The url is protected, please log in.' : '';
+		renderForm( error, '', res );
 	},
 
 	logout: function( req, res ){
@@ -60,6 +66,13 @@ module.exports = {
 						if( err )
 							return renderForm( 'There was an unexpected error.', req.body.username, res);
 						log.info( 'User ' + req.body.username + ' authenticated.');
+
+						// If there is a stored page
+						if(req.session.redirect) {
+							url = req.session.redirect;
+							delete req.session.redirect;
+						}
+
 						res.redirect( url );
 					});
 				});
