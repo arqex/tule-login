@@ -22,7 +22,8 @@ module.exports = {
 			},
 			cypher: {
 				rounds: 10
-			}
+			},
+			protectedAccess: []
 		};
 
 		hooks.addFilter('settings:get:routes:static', function(routes){
@@ -80,6 +81,10 @@ module.exports = {
 			// Initialize db variables
 			settings = config.require( 'settings' );
 			db = config.require( 'qdb' );
+
+			// update protected routes
+			settings.get( 'apiUrl' ).then( addToProtectedUrls );
+			settings.get( 'baseUrl' ).then( addToProtectedUrls );
 
 			// Init login middleware
 			loginMiddleware.init();
@@ -252,3 +257,17 @@ var checkUserCollection = function() {
 		})
 	;
 };
+
+
+function getLoginUrl() {
+	return settings.get('apiUrl')
+		.then( function( url ){
+			return url + '/' + config.tulelogin.urls.login;
+		})
+	;
+}
+
+function addToProtectedUrls( url ){
+	console.log('Adding protected url ' + url);
+	config.tulelogin.protectedAccess.push(url);
+}

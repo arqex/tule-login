@@ -6,11 +6,11 @@ var config = require('config'),
 	bcrypt = require('bcrypt'),
 	Q = require('q'),
 	logger = require( 'winston' ),
+	Path = require('path'),
 	db, dbsettings
 ;
 
-var settings = config.tulelogin.settings,
-	activeUsers = false,
+var activeUsers = false,
 	apiUrl = config.tule.apiUrl,
 	Users
 ;
@@ -25,8 +25,6 @@ function init() {
 
 	//Update login url
 	getLoginUrl();
-
-	console.log('Estrategia!');
 
 	passport.use( new LocalStrategy( checkLogin ) );
 
@@ -46,13 +44,19 @@ function init() {
 	});
 }
 
-function getLoginUrl() {
+
+var apiUrl = config.tule.apiUrl;
+function getApiUrl() {
 	dbsettings.get('apiUrl')
 		.then( function( url ){
 			apiUrl = url;
 		})
 	;
 
+	return apiUrl;
+}
+
+function getLoginUrl() {
 	return apiUrl + '/' + config.tulelogin.urls.login;
 }
 
@@ -94,6 +98,21 @@ function isAuthEnabled() {
 	return activeUsers;
 }
 
+function isProtectedUrl( url ){
+	var protectedUrl = false,
+		protectedUrls = config.tulelogin.protectedAccess,
+		i = 0,
+		current
+	;
+
+	while( !protectedUrl && i < protectedUrls.length ) {
+		current = protectedUrls[i++];
+		protectedUrl = url.slice(0, current.length) == current;
+	}
+
+	return protectedUrl;
+}
+
 function middleware(req, res, next) {
 	if( !isAuthEnabled() )
 		return next();
@@ -107,12 +126,13 @@ function middleware(req, res, next) {
 		sessionMiddleWare( req, res, function(){
 			var loginUrl = getLoginUrl();
 
-			if( req.isAuthenticated() || req.url == loginUrl )
+			if( req.isAuthenticated() || req.url == loginUrl || !isProtectedUrl(req.url) )
 				return next();
 
-			if( req.url != loginUrl )
+			// Save redirect url for the login
+			var apiUrl = getApiUrl();
+			if( req.url != loginUrl && !Path.extname(req.url) && req.url.slice(0, apiUrl.length) != apiUrl )
 				req.session.redirect = req.url;
-
 
 			res.redirect( loginUrl );
 		});

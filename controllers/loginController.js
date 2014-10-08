@@ -53,29 +53,30 @@ module.exports = {
 	authenticate: function( req, res ){
 		settings.get( 'baseUrl' )
 			.then( function( url ){
-
-				var authenticate = passport.authenticate( 'local', function( err, user ){
-					if (err) {
-						return renderForm( 'There was an unexpected error.', req.body.username, res);
-					}
-					if (!user) {
-						return renderForm( 'Wrong username or password.', req.body.username, res);
-					}
-
-					req.logIn( user, function( err ){
-						if( err )
+				var redirectUrl = req.session.redirect,
+					authenticate = passport.authenticate( 'local', function( err, user ){
+						if (err) {
 							return renderForm( 'There was an unexpected error.', req.body.username, res);
-						log.info( 'User ' + req.body.username + ' authenticated.');
-
-						// If there is a stored page
-						if(req.session.redirect) {
-							url = req.session.redirect;
-							delete req.session.redirect;
+						}
+						if (!user) {
+							return renderForm( 'Wrong username or password.', req.body.username, res);
 						}
 
-						res.redirect( url );
-					});
-				});
+						req.logIn( user, function( err ){
+							if( err )
+								return renderForm( 'There was an unexpected error.', req.body.username, res);
+							log.info( 'User ' + req.body.username + ' authenticated.');
+
+							// If there is a stored page
+							if(req.session.redirect) {
+								url = req.session.redirect;
+								delete req.session.redirect;
+							}
+
+							res.redirect( redirectUrl || url );
+						});
+					})
+				;
 
 				authenticate( req, res );
 			})
