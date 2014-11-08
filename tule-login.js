@@ -215,11 +215,16 @@ var updateSettings = function( newSettings ) {
 var checkUserCollection = function() {
 	var collectionName = 'collection_' + config.tulelogin.userCollection;
 
+	console.log( 'Checking collection' );
+
 	settings.get( collectionName )
 		.then( function( collectionSetting ){
 			if( collectionSetting ) {
 				return;
 			}
+
+
+			console.log( 'Collection doesnt exist' );
 
 			// Create user definition
 			var settingsDb = config.require( 'db' ).getInstance('settings');

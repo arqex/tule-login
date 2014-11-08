@@ -3,7 +3,7 @@
 var config = require('config'),
 	passport = require( 'passport' ),
 	LocalStrategy = require( 'passport-local').Strategy,
-	bcrypt = require('bcrypt'),
+	bcrypt = require('bcryptjs'),
 	Q = require('q'),
 	logger = require( 'winston' ),
 	Path = require('path'),
