@@ -12,14 +12,20 @@ var config = require('config'),
 
 var activeUsers = false,
 	apiUrl = config.tule.apiUrl,
-	Users
+	allowedUrls = [],
+	updatingUrls = false,
+	Users, hooks
 ;
 
-function init() {
+function init( hooksObj ) {
+	hooks = hooksObj;
+
 	// Initialize variables
 	db = config.require( 'qdb' );
 	dbsettings = config.require( 'settings' );
 	Users = db( config.tulelogin.userCollection );
+
+	updateAllowedUrls();
 
 	checkActiveUsers();
 
@@ -105,12 +111,34 @@ function isProtectedUrl( url ){
 		current
 	;
 
+	updateAllowedUrls();
+
+	// Allowed urls have preference
+	for(; i<allowedUrls.length; i++){
+		if( url.slice(0, allowedUrls[i].length) == allowedUrls[i] )
+			return false;
+	}
+
+	i = 0;
 	while( !protectedUrl && i < protectedUrls.length ) {
 		current = protectedUrls[i++];
 		protectedUrl = url.slice(0, current.length) == current;
 	}
 
 	return protectedUrl;
+}
+
+function updateAllowedUrls() {
+	if( updatingUrls )
+		return;
+
+	updatingUrls = hooks.filter('allowedUrls', config.tulelogin.allowedAccess )
+		.then( function( urls ){
+			updatingUrls = false;
+			if( Array.isArray(urls) )
+				allowedUrls = urls;
+		})
+	;
 }
 
 function middleware(req, res, next) {

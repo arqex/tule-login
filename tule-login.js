@@ -23,7 +23,8 @@ module.exports = {
 			cypher: {
 				rounds: 10
 			},
-			protectedAccess: []
+			protectedAccess: [],
+			allowedAccess: []
 		};
 
 		hooks.addFilter('settings:get:routes:static', function(routes){
@@ -87,7 +88,7 @@ module.exports = {
 			settings.get( 'baseUrl' ).then( addToProtectedUrls );
 
 			// Init login middleware
-			loginMiddleware.init();
+			loginMiddleware.init( hooks );
 
 			// Cache the settings
 			settings.get( config.tulelogin.settingsName )
